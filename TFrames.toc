@@ -1,0 +1,8 @@
+## Interface: 11200
+## Title: Turtle Frames
+## Notes: A Turtle WoW addon with gliding loot, XP, and money notifications
+## Version: 0.9
+## Author: Serra
+## SavedVariables: TFramesSettingsSaved
+
+TFrames.lua
