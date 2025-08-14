@@ -6,6 +6,10 @@ A sleek notification addon for **Turtle WoW** (1.12) that displays beautiful gli
 ![WoW Version](https://img.shields.io/badge/WoW-1.12-orange)
 ![Server](https://img.shields.io/badge/server-Turtle%20WoW-green)
 
+## Demo
+
+[![TFrames Demo](https://streamable.com/isbgwi)](https://streamable.com/isbgwi)
+
 ## Features
 
 - 🎯 **Gliding Notifications**: Smooth sliding animations with fade effects
