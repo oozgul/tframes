@@ -23,7 +23,7 @@ https://github.com/user-attachments/assets/dcc2f353-f108-449d-988c-720317a81b9c
 
 1. Open your TurtleWoW launcher and navigate to Addons section
 2. Click on "Add new Addon" button
-3. Paste in the repository URL: https://github.com/oozgul/tframes/
+3. Paste in the repository URL: https://github.com/oozgul/tframes
 4. All done! You can launch the game now.
 
 ## Commands
