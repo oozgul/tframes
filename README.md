@@ -21,9 +21,10 @@ https://github.com/user-attachments/assets/dcc2f353-f108-449d-988c-720317a81b9c
 
 ## Installation
 
-1. Download the latest release or clone this repository
-2. Extract/copy the `TFrames` folder to your `Interface/AddOns/` directory
-3. Restart World of Warcraft or type `/reload` in-game
+1. Open your TurtleWoW launcher and navigate to Addons section
+2. Click on "Add new Addon" button
+3. Paste in the repository URL: https://github.com/oozgul/tframes/
+4. All done! You can launch the game now.
 
 ## Commands
 
