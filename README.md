@@ -8,7 +8,7 @@ A sleek notification addon for **Turtle WoW** (1.12) that displays beautiful gli
 
 ## Demo
 
-<img src="https://i.imgur.com/wKN5iEE.gif"/>
+![](https://i.imgur.com/wKN5iEE.gif)
 
 ## Features
 
