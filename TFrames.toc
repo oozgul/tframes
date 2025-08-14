@@ -1,5 +1,5 @@
 ## Interface: 11200
-## Title: Turtle Frames
+## Title: TFrames
 ## Notes: A Turtle WoW addon with gliding loot, XP, and money notifications
 ## Version: 0.9
 ## Author: Serra

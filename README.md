@@ -20,7 +20,6 @@ A sleek notification addon for **Turtle WoW** (1.12) that displays beautiful gli
 1. Download the latest release or clone this repository
 2. Extract/copy the `TFrames` folder to your `Interface/AddOns/` directory
 3. Restart World of Warcraft or type `/reload` in-game
-4. You should see "Turtle Frames: ready!" in your chat
 
 ## Commands
 
