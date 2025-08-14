@@ -256,7 +256,7 @@ evtFrame:SetScript("OnEvent", function()
         
         -- Check if we have a recent ITEM_PUSH icon and stack info (within 2 seconds)
         local iconTexture = "Interface\\Icons\\INV_Misc_Bag_08"  -- Default
-        local recentPush = _G.TFRAMES_RECENT_PUSH
+        local recentPush = getglobal("TFRAMES_RECENT_PUSH")
 
         
         if recentPush and (GetTime() - recentPush.time) < 2 then
@@ -265,7 +265,7 @@ evtFrame:SetScript("OnEvent", function()
           if quantity > 1 and recentPush.maxStack and recentPush.maxStack > 1 and recentPush.maxStack ~= quantity then
             displayText = displayText .. " (/" .. recentPush.maxStack .. ")"
           end
-          _G.TFRAMES_RECENT_PUSH = nil  -- Clear it
+          setglobal("TFRAMES_RECENT_PUSH", nil)  -- Clear it
         end
         
         -- Extract item link from the chat message using 1.12 format
@@ -347,11 +347,11 @@ evtFrame:SetScript("OnEvent", function()
       local iconPath = arg2 or "Interface\\Icons\\INV_Misc_Bag_08"
       
       -- Store the icon and max stack size for CHAT_MSG_LOOT to use
-      _G.TFRAMES_RECENT_PUSH = {
+      setglobal("TFRAMES_RECENT_PUSH", {
         icon = iconPath,
         maxStack = stackSize,
         time = GetTime()
-      }
+      })
     end 
   end 
 end) 
