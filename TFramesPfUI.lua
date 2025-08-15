@@ -7,12 +7,18 @@ pfUI:RegisterSkin("TFrames", "vanilla", function()
   
   if TFrames and TFrames.ApplyNotifStyles then
     TFrames.ApplyNotifStyles = function(frame, borderColor)
-      CreateBackdrop(frame, 5, true, .75)
+      local rawborder, border = GetBorderSize()
+      local inset = 5 - border
+
+      CreateBackdrop(frame, nil, nil, .85)
       CreateBackdropShadow(frame)
+
+      frame.backdrop:SetPoint("TOPLEFT", inset, -inset)
+      frame.backdrop:SetPoint("BOTTOMRIGHT", -inset, inset)
 
       -- Set border color based on notification type
       if borderColor then
-        frame:SetBackdropBorderColor(borderColor.r, borderColor.g, borderColor.b)
+        frame.backdrop:SetBackdropBorderColor(borderColor.r, borderColor.g, borderColor.b)
       end
     end
   end
