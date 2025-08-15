@@ -1,6 +1,9 @@
 -- Turtle Frames for Turtle WoW - Gliding Notifications with Tooltips
 DEFAULT_CHAT_FRAME:AddMessage("Turtle Frames: loading...")
 
+-- TFrames namespace
+TFrames = TFrames or {}
+
 -- Anchor frame
 TFramesAnchor = CreateFrame("Frame", "TFramesAnchor", UIParent)
 TFramesAnchor:SetWidth(80)
@@ -27,6 +30,22 @@ local TFramesSettings = {
   money = true,
 }
 
+TFrames.ApplyNotifStyles = function(frame, borderColor)
+  frame:SetBackdrop({
+    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+    tile = true, tileSize = 16, edgeSize = 16,
+    insets = {left = 5, right = 5, top = 5, bottom = 5}
+  })
+    
+  -- Set border color based on notification type
+  if borderColor then
+    frame:SetBackdropBorderColor(borderColor.r, borderColor.g, borderColor.b)
+  end
+  -- No else clause - let it use the default frame border color
+  frame:SetBackdropColor(0, 0, 0, 0.8)
+end
+
 -- Enhanced notification function with color customization
 local function ShowNotifWithIcon(text, iconTexture, borderColor, itemLink, itemQuality)
   local f = CreateFrame("Frame", nil, UIParent)
@@ -38,19 +57,7 @@ local function ShowNotifWithIcon(text, iconTexture, borderColor, itemLink, itemQ
   f:SetPoint("BOTTOMLEFT", TFramesAnchor, "BOTTOMRIGHT", 10, yOffset)
   notifCount = notifCount + 1
   
-  f:SetBackdrop({
-	bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-	edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-    tile = true, tileSize = 16, edgeSize = 16,
-    insets = {left = 5, right = 5, top = 5, bottom = 5}
-  })
-  
-  -- Set border color based on notification type
-  if borderColor then
-    f:SetBackdropBorderColor(borderColor.r, borderColor.g, borderColor.b)
-  end
-  -- No else clause - let it use the default frame border color
-  f:SetBackdropColor(0, 0, 0, 0.8)
+  TFrames.ApplyNotifStyles(f, borderColor)
   
   -- Icon
   local icon = f:CreateTexture(nil, "ARTWORK")

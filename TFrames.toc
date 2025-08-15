@@ -4,5 +4,7 @@
 ## Version: 0.9
 ## Author: Serra
 ## SavedVariables: TFramesSettingsSaved
+## OptionalDeps: pfUI
 
 TFrames.lua
+TFramesPfUI.lua
