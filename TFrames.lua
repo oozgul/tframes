@@ -29,13 +29,23 @@ local TFramesSettings = {
 
 -- Enhanced notification function with color customization
 local function ShowNotifWithIcon(text, iconTexture, borderColor, itemLink, itemQuality)
+  -- Ensure text is valid
+  if not text or text == "" then
+    text = "Unknown Item"
+  end
+  text = tostring(text)  -- Ensure it's a string
+  
   local f = CreateFrame("Frame", nil, UIParent)
   f:SetWidth(245)
   f:SetHeight(45)
   
   -- Position notifications relative to the anchor
   local yOffset = 50 + (notifCount * 45)
-  f:SetPoint("BOTTOMLEFT", TFramesAnchor, "BOTTOMRIGHT", 10, yOffset)
+  local finalX = 10  -- Final X position
+  local startX = finalX - 60  -- Start 60 pixels to the left (more subtle)
+  
+  -- Position normally for now, we'll animate after show
+  f:SetPoint("BOTTOMLEFT", TFramesAnchor, "BOTTOMRIGHT", finalX, yOffset)
   notifCount = notifCount + 1
   
   f:SetBackdrop({
@@ -83,9 +93,22 @@ local function ShowNotifWithIcon(text, iconTexture, borderColor, itemLink, itemQ
       GameTooltip:SetOwner(f, "ANCHOR_RIGHT")
       
       -- Extract itemID from the itemString for 1.12 compatibility
-      local found, _, itemString = string.find(itemLink, "^|%x+|H(.+)|h%[.+%]")
-      if itemString then
-        local itemID = tonumber(string.match(itemString, "item:(%d+)"))
+      local hStart = string.find(itemLink, "|H", 1, true)
+      local hEnd = string.find(itemLink, "|h", 1, true)
+      
+      if hStart and hEnd and hEnd > hStart then
+        local itemString = string.sub(itemLink, hStart + 2, hEnd - 1)  -- Extract between |H and |h
+        
+        -- Extract itemID from itemString (format: item:12345:...)
+        local colonPos = string.find(itemString, ":", 1, true)
+        local itemID = nil
+        if colonPos then
+          local secondColonPos = string.find(itemString, ":", colonPos + 1, true)
+          if secondColonPos then
+            local itemIDStr = string.sub(itemString, colonPos + 1, secondColonPos - 1)
+            itemID = tonumber(itemIDStr)
+          end
+        end
         if itemID then
           -- Use SetItemByID which works reliably in 1.12
           local ok = pcall(function()
@@ -109,7 +132,42 @@ local function ShowNotifWithIcon(text, iconTexture, borderColor, itemLink, itemQ
     end)
   end
     
+  -- Start invisible and to the left, then animate in
+  f:SetPoint("BOTTOMLEFT", TFramesAnchor, "BOTTOMRIGHT", startX, yOffset)
+  f:SetAlpha(0)
   f:Show()
+  
+  -- Fast, smooth fade-in animation
+  local fadeInTimer = CreateFrame("Frame")
+  local fadeInStartTime = GetTime()
+  local fadeInDuration = 0.25  -- Fast and snappy
+  local animationActive = true
+  
+  fadeInTimer:SetScript("OnUpdate", function()
+    if not animationActive then return end
+    
+    local elapsed = GetTime() - fadeInStartTime
+    local progress = elapsed / fadeInDuration
+    
+    if progress >= 1 then
+      -- Animation complete
+      progress = 1
+      animationActive = false
+      fadeInTimer:SetScript("OnUpdate", nil)
+    end
+    
+    -- Smooth ease-out curve for natural motion
+    local easedProgress = 1 - (1 - progress) * (1 - progress) * (1 - progress)
+    
+    -- Interpolate position and alpha
+    local currentX = startX + (finalX - startX) * easedProgress
+    local alpha = progress  -- Linear fade looks more natural
+    
+    -- Apply smooth animation
+    f:ClearAllPoints()
+    f:SetPoint("BOTTOMLEFT", TFramesAnchor, "BOTTOMRIGHT", currentX, yOffset)
+    f:SetAlpha(alpha)
+  end)
   
 	  -- Auto-hide timer with fade and slide effect
   local timer = CreateFrame("Frame")
@@ -117,15 +175,18 @@ local function ShowNotifWithIcon(text, iconTexture, borderColor, itemLink, itemQ
   local showDuration = 4  -- Show for 4 seconds
   local fadeDuration = 1  -- Fade out over 1 second
   local slideDistance = 100  -- Slide 100 pixels to the right
-  local originalX = 10  -- Original X offset from anchor
+  local originalX = finalX  -- Use finalX instead of hardcoded 10
   
   timer:SetScript("OnUpdate", function()
     local elapsed = GetTime() - startTime
     
     if elapsed < showDuration then
-      -- Full opacity during show phase
-      f:SetAlpha(1)
-      f:SetPoint("BOTTOMLEFT", TFramesAnchor, "BOTTOMRIGHT", originalX, yOffset)
+      -- During show phase, don't interfere with fade-in animation
+      if not animationActive then
+        -- Only set position/alpha if fade-in is complete
+        f:SetAlpha(1)
+        f:SetPoint("BOTTOMLEFT", TFramesAnchor, "BOTTOMRIGHT", originalX, yOffset)
+      end
     elseif elapsed < showDuration + fadeDuration then
       -- Fade out and slide phase with smooth easing
       local fadeProgress = (elapsed - showDuration) / fadeDuration
@@ -209,49 +270,174 @@ evtFrame:RegisterEvent("CHAT_MSG_LOOT")
 evtFrame:RegisterEvent("CHAT_MSG_MONEY")
 evtFrame:RegisterEvent("ITEM_PUSH")
 evtFrame:SetScript("OnEvent", function()
+  -- Debug: Show all events we receive
+  DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Event = " .. tostring(event) .. ", arg1 = " .. tostring(arg1 or "nil"))
+  
   if event == "CHAT_MSG_COMBAT_XP_GAIN" then
-    local msg = arg1 or ""
-    local xp = tonumber(string.match(msg, "(%d+)%s+experience"))
-    if xp and TFramesSettings.xp then
-      ShowNotifWithIcon("+" .. xp .. " XP", "Interface\\Icons\\INV_Misc_Note_01", {r = 0.8, g = 0.4, b = 1}, nil, nil)  -- Purple border
+    if arg1 and type(arg1) == "string" and arg1 ~= "" and TFramesSettings.xp then
+      local msg = tostring(arg1)
+      DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: XP message = '" .. msg .. "'")
+      
+      -- Extract XP amount from message like "You gain 140 experience"
+      local xp = nil
+      
+      -- Look for "gain" in the message, then extract the number before "experience"
+      local gainPos = string.find(msg, "gain", 1, true)
+      if gainPos then
+        -- Extract everything after "gain "
+        local afterGain = string.sub(msg, gainPos + 5)  -- +5 to skip "gain "
+        
+        -- Extract digits from the start
+        local xpStr = ""
+        for i = 1, string.len(afterGain) do
+          local char = string.sub(afterGain, i, i)
+          if char >= "0" and char <= "9" then
+            xpStr = xpStr .. char
+          else
+            break  -- Stop at first non-digit
+          end
+        end
+        
+        if xpStr ~= "" then
+          xp = tonumber(xpStr)
+          DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Extracted XP: " .. xp)
+        end
+      end
+      
+      if xp and xp > 0 then
+        ShowNotifWithIcon("+" .. xp .. " XP", "Interface\\Icons\\INV_Misc_Note_01", {r = 0.8, g = 0.4, b = 1}, nil, nil)  -- Purple border
+      else
+        DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Could not extract XP from message")
+      end
     end
   elseif event == "CHAT_MSG_LOOT" then
     -- Handle loot messages and use recent ITEM_PUSH icon
-    local msg = arg1 or ""
-
+    -- Debug: Show what messages we're getting
+    if arg1 then
+      DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: CHAT_MSG_LOOT = '" .. tostring(arg1) .. "'")
+    end
     
-    if (string.find(msg, "You receive") or string.find(msg, "Received item")) and TFramesSettings.loot then
-      -- Extract item name and quantity from chat (handle [Item]x200] format)
-      local itemName = string.match(msg, "You receive loot:%s*%[(.-)%]")  -- Non-greedy match
-      if not itemName then
-        itemName = string.match(msg, "You receive item:%s*%[(.-)%]")  -- Non-greedy for vendor
-      end
-      if not itemName then
-        itemName = string.match(msg, "Received item:%s*%[(.-)%]")  -- Non-greedy for quest rewards
-      end
-      if not itemName then
-        itemName = string.match(msg, "%[(.-)%]")  -- Non-greedy fallback
+    if arg1 and type(arg1) == "string" and arg1 ~= "" and TFramesSettings.loot then
+      local msg = tostring(arg1)
+      local foundReceive, foundReceived = false, false
+      
+      -- Safely check for loot messages - check multiple patterns
+      local foundLoot = false
+      
+      -- Pattern 1: "You receive item:" (vendor purchases, quest rewards)
+      local success1, result1 = pcall(string.find, msg, "You receive item")
+      if success1 and result1 then 
+        foundLoot = true 
+        DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Matched 'You receive item'")
       end
       
+      -- Pattern 2: "You receive loot:" (mob drops)
+      local success2, result2 = pcall(string.find, msg, "You receive loot")
+      if success2 and result2 then 
+        foundLoot = true 
+        DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Matched 'You receive loot'")
+      end
+      
+      -- Pattern 3: "Received item:" (quest completion)
+      local success3, result3 = pcall(string.find, msg, "Received item") 
+      if success3 and result3 then 
+        foundLoot = true 
+        DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Matched 'Received item'")
+      end
+      
+      -- Pattern 4: Just "You loot" (alternative loot message)
+      local success4, result4 = pcall(string.find, msg, "You loot")
+      if success4 and result4 then 
+        foundLoot = true 
+        DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Matched 'You loot'")
+      end
+      
+      if foundLoot then
+        DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Processing loot message: " .. msg)
+        
+        -- Extract item name and quantity from chat (handle [Item]x200] format)
+        local itemName = nil
+        
+        -- Debug: Show the exact message we're trying to parse
+        DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Parsing message: '" .. msg .. "'")
+        DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Message length: " .. string.len(msg))
+        
+        -- Use string.find instead of string.match (which doesn't exist in 1.12)
+        local success, startPos, endPos = pcall(string.find, msg, "%[(.-)%]")  -- Find [ and ]
+        DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Find success: " .. tostring(success) .. ", start: " .. tostring(startPos or "nil") .. ", end: " .. tostring(endPos or "nil"))
+        
+        if success and startPos then
+          -- Extract the text between [ and ]
+          local bracketStart = string.find(msg, "%[")
+          local bracketEnd = string.find(msg, "%]")
+          if bracketStart and bracketEnd and bracketEnd > bracketStart then
+            local fullMatch = string.sub(msg, bracketStart + 1, bracketEnd - 1)  -- Get text between brackets
+            DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Extracted from brackets: '" .. fullMatch .. "'")
+            
+            -- Remove quantity suffix if present (e.g., "Rough Arrowx200" -> "Rough Arrow")
+            local nameEnd = string.find(fullMatch, "x%d+$")
+            if nameEnd then
+              itemName = string.sub(fullMatch, 1, nameEnd - 1)
+            else
+              itemName = fullMatch
+            end
+            DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Final item name: '" .. itemName .. "'")
+          end
+        else
+          DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Could not find brackets in message")
+        end
+      
       if itemName then
-        -- Extract quantity - try simple pattern from green chat: [Item]x200
+        -- Extract quantity - simple approach: look for "x" + digits anywhere in message
         local quantity = 1
-        -- Try the simple green chat format first
-        local quantityMatch = string.match(msg, "%[.-%]x(%d+)")  -- [Rough Arrow]x200
-        if not quantityMatch then
-          quantityMatch = string.match(msg, "%]x(%d+)")  -- ]x200
-        end
-        if not quantityMatch then
-          quantityMatch = string.match(msg, "x(%d+)")  -- x200
-        end
-        if quantityMatch then
-          quantity = tonumber(quantityMatch)
+        DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Looking for 'x' + digits in: '" .. msg .. "'")
+        
+        -- Find any "x" in the message
+        local xPos = string.find(msg, "x", 1, true)  -- Plain text search for x
+        DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Found 'x' at position: " .. tostring(xPos or "nil"))
+        
+        if xPos then
+          -- Extract everything after the "x"
+          local afterX = string.sub(msg, xPos + 1)
+          DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: After 'x': '" .. afterX .. "'")
+          
+          -- Extract only digits from the start
+          local cleanNumber = ""
+          for i = 1, string.len(afterX) do
+            local char = string.sub(afterX, i, i)
+            if char >= "0" and char <= "9" then
+              cleanNumber = cleanNumber .. char
+            else
+              break  -- Stop at first non-digit
+            end
+          end
+          
+          DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Extracted digits: '" .. cleanNumber .. "'")
+          
+          if cleanNumber ~= "" then
+            local numQuantity = tonumber(cleanNumber)
+            if numQuantity and numQuantity > 1 then  -- Only use if > 1
+              quantity = numQuantity
+              DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Using quantity: " .. quantity)
+            end
+          end
+        else
+          DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: No 'x' found, using default quantity: 1")
         end
         
         -- Create display text with stack info
         local displayText = itemName
-        if quantity > 1 then
-          displayText = quantity .. "x " .. itemName
+        if not displayText or displayText == "" then
+          displayText = "Unknown Item"
+        end
+        
+        DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Before quantity check - displayText: '" .. displayText .. "', quantity: " .. tostring(quantity))
+        
+        if quantity and quantity > 1 then
+          displayText = quantity .. "x " .. displayText
+          DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: After quantity check - displayText: '" .. displayText .. "'")
+        else
+          DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Quantity check failed - quantity: " .. tostring(quantity) .. ", > 1: " .. tostring(quantity and quantity > 1))
         end
         
         -- Check if we have a recent ITEM_PUSH icon and stack info (within 2 seconds)
@@ -261,37 +447,65 @@ evtFrame:SetScript("OnEvent", function()
         
         if recentPush and (GetTime() - recentPush.time) < 2 then
           iconTexture = recentPush.icon
-          -- Add stack info for items with quantity > 1, or show the maxStack if it's meaningful
-          if quantity > 1 and recentPush.maxStack and recentPush.maxStack > 1 and recentPush.maxStack ~= quantity then
-            displayText = displayText .. " (/" .. recentPush.maxStack .. ")"
-          end
+          -- Don't add stack info - keep display clean
           setglobal("TFRAMES_RECENT_PUSH", nil)  -- Clear it
         end
         
         -- Extract item link from the chat message using 1.12 format
-        local itemLink = string.match(msg, "(\124c%x+\124Hitem:[^\124]+\124h%[[^\]]+%]\124h\124r)")
-        if not itemLink then
-          -- Try without color codes
-          itemLink = string.match(msg, "(\124Hitem:[^\124]+\124h%[[^\]]+%]\124h)")
+        local itemLink = nil
+        
+        -- Look for item links in the message (they start with |c and contain |Hitem:)
+        local linkStart = string.find(msg, "|c", 1, true)  -- Find color code start
+        local linkEnd = string.find(msg, "|r", 1, true)    -- Find color code end
+        
+        if linkStart and linkEnd and linkEnd > linkStart then
+          itemLink = string.sub(msg, linkStart, linkEnd + 1)  -- Extract full colored link
+          DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Extracted item link: " .. itemLink)
+        else
+          -- Try without color codes - look for |Hitem: directly
+          linkStart = string.find(msg, "|Hitem:", 1, true)
+          if linkStart then
+            linkEnd = string.find(msg, "|h", linkStart, true)  -- Find end of hyperlink
+            if linkEnd then
+              local linkEnd2 = string.find(msg, "|h", linkEnd + 2, true)  -- Find second |h (closing)
+              if linkEnd2 then
+                itemLink = string.sub(msg, linkStart, linkEnd2 + 1)
+                DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Extracted simple item link: " .. itemLink)
+              end
+            end
+          end
         end
         
 		-- Extract item quality from the itemString
         local itemQuality = nil
         local isQuestItem = false
         if itemLink then
-          local found, _, itemString = string.find(itemLink, "^|%x+|H(.+)|h%[.+%]")
-          if itemString then
-            -- ItemString format: "item:itemID:enchant:gem1:gem2:gem3:gem4:suffix:unique:level:reforging:upgradeId:instance:bonus:quality"
-            -- For 1.12, it's simpler: "item:itemID:enchant:gem1:gem2:gem3:gem4:suffix:unique"
-            -- Quality is usually determined by itemID, but let's try to get it from GetItemInfo
-            local itemID = tonumber(string.match(itemString, "item:(%d+)"))
-            if itemID then
-              local itemName, _, quality, _, _, itemType, itemSubType = GetItemInfo(itemID)
-              itemQuality = quality
-              
-              -- Check if it's a quest item by type or subtype
-              if itemType == "Quest" or itemSubType == "Quest" then
-                isQuestItem = true
+          -- Extract itemString from the link (between |H and |h)
+          local hStart = string.find(itemLink, "|H", 1, true)
+          local hEnd = string.find(itemLink, "|h", 1, true)
+          
+          if hStart and hEnd and hEnd > hStart then
+            local itemString = string.sub(itemLink, hStart + 2, hEnd - 1)  -- Extract between |H and |h
+            DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Extracted itemString: " .. itemString)
+            
+            -- Extract itemID from itemString (format: item:12345:...)
+            local colonPos = string.find(itemString, ":", 1, true)
+            if colonPos then
+              local secondColonPos = string.find(itemString, ":", colonPos + 1, true)
+              if secondColonPos then
+                local itemIDStr = string.sub(itemString, colonPos + 1, secondColonPos - 1)
+                local itemID = tonumber(itemIDStr)
+                DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Extracted itemID: " .. tostring(itemID))
+                
+                if itemID then
+                  local itemName, _, quality, _, _, itemType, itemSubType = GetItemInfo(itemID)
+                  itemQuality = quality
+                  
+                  -- Check if it's a quest item by type or subtype
+                  if itemType == "Quest" or itemSubType == "Quest" then
+                    isQuestItem = true
+                  end
+                end
               end
             end
           end
@@ -302,22 +516,51 @@ evtFrame:SetScript("OnEvent", function()
           itemQuality = "quest"  -- Custom identifier for quest items
         end
 
+        DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Creating notification: " .. displayText)
         ShowNotifWithIcon(displayText, iconTexture, nil, itemLink, itemQuality)
+      end
       end
     end
   elseif event == "CHAT_MSG_MONEY" then
-    local msg = arg1 or ""
-    if string.find(msg, "You") and TFramesSettings.money then
-      -- Simple approach: extract any number and check what type of money it is
-      local amount = tonumber(string.match(msg, "(%d+)"))
+    if arg1 and type(arg1) == "string" and arg1 ~= "" and TFramesSettings.money then
+      local msg = tostring(arg1)
+      local foundYou = pcall(string.find, msg, "You")
+      if foundYou then
+      -- Simple approach: extract any number from the message
+      local amount = nil
+      
+      -- Look for digits in the message
+      for i = 1, string.len(msg) do
+        local char = string.sub(msg, i, i)
+        if char >= "0" and char <= "9" then
+          -- Found start of a number, extract it
+          local numStr = ""
+          for j = i, string.len(msg) do
+            local numChar = string.sub(msg, j, j)
+            if numChar >= "0" and numChar <= "9" then
+              numStr = numStr .. numChar
+            else
+              break
+            end
+          end
+          if numStr ~= "" then
+            amount = tonumber(numStr)
+            break
+          end
+        end
+      end
       local g, s, c = 0, 0, 0
       
       if amount then
-        if string.find(msg, "Gold") or string.find(msg, "gold") then
+        local foundGold = pcall(string.find, msg, "Gold") or pcall(string.find, msg, "gold")
+        local foundSilver = pcall(string.find, msg, "Silver") or pcall(string.find, msg, "silver")
+        local foundCopper = pcall(string.find, msg, "Copper") or pcall(string.find, msg, "copper")
+        
+        if foundGold then
           g = amount
-        elseif string.find(msg, "Silver") or string.find(msg, "silver") then
+        elseif foundSilver then
           s = amount
-        elseif string.find(msg, "Copper") or string.find(msg, "copper") then
+        elseif foundCopper then
           c = amount
         end
       end
@@ -340,6 +583,7 @@ evtFrame:SetScript("OnEvent", function()
 
         ShowNotifWithIcon("+" .. moneyText, "Interface\\Icons\\INV_Misc_Coin_01", {r = 1, g = 0.8, b = 0}, nil, nil)  -- Gold border
       end 
+      end
     end
   elseif event == "ITEM_PUSH" then
     if TFramesSettings.loot then
