@@ -274,19 +274,19 @@ evtFrame:SetScript("OnEvent", function()
     if arg1 and type(arg1) == "string" and arg1 ~= "" and TFramesSettings.xp then
       local msg = tostring(arg1)
       
-      -- Extract XP amount from message like "You gain 140 experience"
+      -- Extract XP amount from message like "Experience gained: 3300."
       local xp = nil
       
-      -- Look for "gain" in the message, then extract the number before "experience"
-      local gainPos = string.find(msg, "gain", 1, true)
-      if gainPos then
-        -- Extract everything after "gain "
-        local afterGain = string.sub(msg, gainPos + 5)  -- +5 to skip "gain "
+      -- Look for "Experience gained:" in the message
+      local gainedPos = string.find(msg, "Experience gained:", 1, true)
+      if gainedPos then
+        -- Extract everything after "Experience gained: "
+        local afterGained = string.sub(msg, gainedPos + 19)  -- +19 to skip "Experience gained: "
         
         -- Extract digits from the start
         local xpStr = ""
-        for i = 1, string.len(afterGain) do
-          local char = string.sub(afterGain, i, i)
+        for i = 1, string.len(afterGained) do
+          local char = string.sub(afterGained, i, i)
           if char >= "0" and char <= "9" then
             xpStr = xpStr .. char
           else
@@ -327,6 +327,12 @@ evtFrame:SetScript("OnEvent", function()
       -- Pattern 3: "Received item:" (quest completion)
       local success3, result3 = pcall(string.find, msg, "Received item") 
       if success3 and result3 then 
+        foundLoot = true 
+      end
+      
+      -- Pattern 3b: "Received Item:" (quest completion - capital I)
+      local success3b, result3b = pcall(string.find, msg, "Received Item") 
+      if success3b and result3b then 
         foundLoot = true 
       end
       
