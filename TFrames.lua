@@ -480,7 +480,6 @@ evtFrame:SetScript("OnEvent", function()
   elseif event == "CHAT_MSG_MONEY" then
     if arg1 and type(arg1) == "string" and arg1 ~= "" and TFramesSettings.money then
       local msg = tostring(arg1)
-      DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Money message = '" .. msg .. "'")
       local foundYou = pcall(string.find, msg, "You")
       if foundYou then
       -- Simple approach: extract any number from the message
@@ -545,15 +544,11 @@ evtFrame:SetScript("OnEvent", function()
         -- Assign to correct currency
         if foundGold then
           g = amount
-          DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Detected GOLD: " .. amount)
         elseif foundSilver then
           s = amount
-          DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Detected SILVER: " .. amount)
         elseif foundCopper then
           c = amount
-          DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Detected COPPER: " .. amount)
         else
-          DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: No currency type detected, defaulting to copper")
           c = amount  -- Default to copper if no type found
         end
       end
