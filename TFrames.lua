@@ -270,13 +270,9 @@ evtFrame:RegisterEvent("CHAT_MSG_LOOT")
 evtFrame:RegisterEvent("CHAT_MSG_MONEY")
 evtFrame:RegisterEvent("ITEM_PUSH")
 evtFrame:SetScript("OnEvent", function()
-  -- Debug: Show all events we receive
-  DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Event = " .. tostring(event) .. ", arg1 = " .. tostring(arg1 or "nil"))
-  
   if event == "CHAT_MSG_COMBAT_XP_GAIN" then
     if arg1 and type(arg1) == "string" and arg1 ~= "" and TFramesSettings.xp then
       local msg = tostring(arg1)
-      DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: XP message = '" .. msg .. "'")
       
       -- Extract XP amount from message like "You gain 140 experience"
       local xp = nil
@@ -300,23 +296,15 @@ evtFrame:SetScript("OnEvent", function()
         
         if xpStr ~= "" then
           xp = tonumber(xpStr)
-          DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Extracted XP: " .. xp)
         end
       end
       
       if xp and xp > 0 then
         ShowNotifWithIcon("+" .. xp .. " XP", "Interface\\Icons\\INV_Misc_Note_01", {r = 0.8, g = 0.4, b = 1}, nil, nil)  -- Purple border
-      else
-        DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Could not extract XP from message")
       end
     end
   elseif event == "CHAT_MSG_LOOT" then
     -- Handle loot messages and use recent ITEM_PUSH icon
-    -- Debug: Show what messages we're getting
-    if arg1 then
-      DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: CHAT_MSG_LOOT = '" .. tostring(arg1) .. "'")
-    end
-    
     if arg1 and type(arg1) == "string" and arg1 ~= "" and TFramesSettings.loot then
       local msg = tostring(arg1)
       local foundReceive, foundReceived = false, false
@@ -328,43 +316,33 @@ evtFrame:SetScript("OnEvent", function()
       local success1, result1 = pcall(string.find, msg, "You receive item")
       if success1 and result1 then 
         foundLoot = true 
-        DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Matched 'You receive item'")
       end
       
       -- Pattern 2: "You receive loot:" (mob drops)
       local success2, result2 = pcall(string.find, msg, "You receive loot")
       if success2 and result2 then 
         foundLoot = true 
-        DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Matched 'You receive loot'")
       end
       
       -- Pattern 3: "Received item:" (quest completion)
       local success3, result3 = pcall(string.find, msg, "Received item") 
       if success3 and result3 then 
         foundLoot = true 
-        DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Matched 'Received item'")
       end
       
       -- Pattern 4: Just "You loot" (alternative loot message)
       local success4, result4 = pcall(string.find, msg, "You loot")
       if success4 and result4 then 
         foundLoot = true 
-        DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Matched 'You loot'")
       end
       
       if foundLoot then
-        DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Processing loot message: " .. msg)
         
         -- Extract item name and quantity from chat (handle [Item]x200] format)
         local itemName = nil
         
-        -- Debug: Show the exact message we're trying to parse
-        DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Parsing message: '" .. msg .. "'")
-        DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Message length: " .. string.len(msg))
-        
         -- Use string.find instead of string.match (which doesn't exist in 1.12)
         local success, startPos, endPos = pcall(string.find, msg, "%[(.-)%]")  -- Find [ and ]
-        DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Find success: " .. tostring(success) .. ", start: " .. tostring(startPos or "nil") .. ", end: " .. tostring(endPos or "nil"))
         
         if success and startPos then
           -- Extract the text between [ and ]
@@ -372,7 +350,6 @@ evtFrame:SetScript("OnEvent", function()
           local bracketEnd = string.find(msg, "%]")
           if bracketStart and bracketEnd and bracketEnd > bracketStart then
             local fullMatch = string.sub(msg, bracketStart + 1, bracketEnd - 1)  -- Get text between brackets
-            DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Extracted from brackets: '" .. fullMatch .. "'")
             
             -- Remove quantity suffix if present (e.g., "Rough Arrowx200" -> "Rough Arrow")
             local nameEnd = string.find(fullMatch, "x%d+$")
@@ -381,25 +358,19 @@ evtFrame:SetScript("OnEvent", function()
             else
               itemName = fullMatch
             end
-            DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Final item name: '" .. itemName .. "'")
           end
-        else
-          DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Could not find brackets in message")
         end
       
       if itemName then
         -- Extract quantity - simple approach: look for "x" + digits anywhere in message
         local quantity = 1
-        DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Looking for 'x' + digits in: '" .. msg .. "'")
         
         -- Find any "x" in the message
         local xPos = string.find(msg, "x", 1, true)  -- Plain text search for x
-        DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Found 'x' at position: " .. tostring(xPos or "nil"))
         
         if xPos then
           -- Extract everything after the "x"
           local afterX = string.sub(msg, xPos + 1)
-          DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: After 'x': '" .. afterX .. "'")
           
           -- Extract only digits from the start
           local cleanNumber = ""
@@ -412,17 +383,12 @@ evtFrame:SetScript("OnEvent", function()
             end
           end
           
-          DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Extracted digits: '" .. cleanNumber .. "'")
-          
           if cleanNumber ~= "" then
             local numQuantity = tonumber(cleanNumber)
             if numQuantity and numQuantity > 1 then  -- Only use if > 1
               quantity = numQuantity
-              DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Using quantity: " .. quantity)
             end
           end
-        else
-          DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: No 'x' found, using default quantity: 1")
         end
         
         -- Create display text with stack info
@@ -431,13 +397,8 @@ evtFrame:SetScript("OnEvent", function()
           displayText = "Unknown Item"
         end
         
-        DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Before quantity check - displayText: '" .. displayText .. "', quantity: " .. tostring(quantity))
-        
         if quantity and quantity > 1 then
           displayText = quantity .. "x " .. displayText
-          DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: After quantity check - displayText: '" .. displayText .. "'")
-        else
-          DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Quantity check failed - quantity: " .. tostring(quantity) .. ", > 1: " .. tostring(quantity and quantity > 1))
         end
         
         -- Check if we have a recent ITEM_PUSH icon and stack info (within 2 seconds)
@@ -460,7 +421,6 @@ evtFrame:SetScript("OnEvent", function()
         
         if linkStart and linkEnd and linkEnd > linkStart then
           itemLink = string.sub(msg, linkStart, linkEnd + 1)  -- Extract full colored link
-          DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Extracted item link: " .. itemLink)
         else
           -- Try without color codes - look for |Hitem: directly
           linkStart = string.find(msg, "|Hitem:", 1, true)
@@ -470,7 +430,6 @@ evtFrame:SetScript("OnEvent", function()
               local linkEnd2 = string.find(msg, "|h", linkEnd + 2, true)  -- Find second |h (closing)
               if linkEnd2 then
                 itemLink = string.sub(msg, linkStart, linkEnd2 + 1)
-                DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Extracted simple item link: " .. itemLink)
               end
             end
           end
@@ -486,7 +445,6 @@ evtFrame:SetScript("OnEvent", function()
           
           if hStart and hEnd and hEnd > hStart then
             local itemString = string.sub(itemLink, hStart + 2, hEnd - 1)  -- Extract between |H and |h
-            DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Extracted itemString: " .. itemString)
             
             -- Extract itemID from itemString (format: item:12345:...)
             local colonPos = string.find(itemString, ":", 1, true)
@@ -495,7 +453,6 @@ evtFrame:SetScript("OnEvent", function()
               if secondColonPos then
                 local itemIDStr = string.sub(itemString, colonPos + 1, secondColonPos - 1)
                 local itemID = tonumber(itemIDStr)
-                DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Extracted itemID: " .. tostring(itemID))
                 
                 if itemID then
                   local itemName, _, quality, _, _, itemType, itemSubType = GetItemInfo(itemID)
@@ -516,7 +473,6 @@ evtFrame:SetScript("OnEvent", function()
           itemQuality = "quest"  -- Custom identifier for quest items
         end
 
-        DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Creating notification: " .. displayText)
         ShowNotifWithIcon(displayText, iconTexture, nil, itemLink, itemQuality)
       end
       end
