@@ -480,6 +480,7 @@ evtFrame:SetScript("OnEvent", function()
   elseif event == "CHAT_MSG_MONEY" then
     if arg1 and type(arg1) == "string" and arg1 ~= "" and TFramesSettings.money then
       local msg = tostring(arg1)
+      DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Money message = '" .. msg .. "'")
       local foundYou = pcall(string.find, msg, "You")
       if foundYou then
       -- Simple approach: extract any number from the message
@@ -508,33 +509,84 @@ evtFrame:SetScript("OnEvent", function()
       local g, s, c = 0, 0, 0
       
       if amount then
-        local foundGold = pcall(string.find, msg, "Gold") or pcall(string.find, msg, "gold")
-        local foundSilver = pcall(string.find, msg, "Silver") or pcall(string.find, msg, "silver")
-        local foundCopper = pcall(string.find, msg, "Copper") or pcall(string.find, msg, "copper")
+        -- Check for currency type in the message
+        local foundGold = false
+        local foundSilver = false
+        local foundCopper = false
         
+        -- Check for gold
+        local success, pos = pcall(string.find, msg, "Gold")
+        if success and pos then foundGold = true end
+        if not foundGold then
+          success, pos = pcall(string.find, msg, "gold")
+          if success and pos then foundGold = true end
+        end
+        
+        -- Check for silver
+        if not foundGold then
+          success, pos = pcall(string.find, msg, "Silver")
+          if success and pos then foundSilver = true end
+          if not foundSilver then
+            success, pos = pcall(string.find, msg, "silver")
+            if success and pos then foundSilver = true end
+          end
+        end
+        
+        -- Check for copper
+        if not foundGold and not foundSilver then
+          success, pos = pcall(string.find, msg, "Copper")
+          if success and pos then foundCopper = true end
+          if not foundCopper then
+            success, pos = pcall(string.find, msg, "copper")
+            if success and pos then foundCopper = true end
+          end
+        end
+        
+        -- Assign to correct currency
         if foundGold then
           g = amount
+          DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Detected GOLD: " .. amount)
         elseif foundSilver then
           s = amount
+          DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Detected SILVER: " .. amount)
         elseif foundCopper then
           c = amount
+          DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: Detected COPPER: " .. amount)
+        else
+          DEFAULT_CHAT_FRAME:AddMessage("TFrames DEBUG: No currency type detected, defaulting to copper")
+          c = amount  -- Default to copper if no type found
         end
       end
       
       if (g > 0 or s > 0 or c > 0) then
-        local parts = {}
-        if g > 0 then parts[1] = g .. "g" end
-        if s > 0 then parts[2] = s .. "s" end  
-        if c > 0 then parts[3] = c .. "c" end
+        -- Build colored money string using WoW color codes
+        local coloredParts = {}
+        
+        -- Gold color: |cffffd700 (bright gold)
+        if g > 0 then 
+          coloredParts[1] = "|cffffd700" .. g .. "g|r"
+        end
+        
+        -- Silver color: |cffc7c7cf (bright silver) 
+        if s > 0 then 
+          coloredParts[2] = "|cffc7c7cf" .. s .. "s|r"
+        end
+        
+        -- Copper color: |cffeda55f (copper/bronze)
+        if c > 0 then 
+          coloredParts[3] = "|cffeda55f" .. c .. "c|r"
+        end
+        
+        -- Combine the colored parts
         local moneyText = ""
         for i = 1, 3 do
-          if parts[i] then
+          if coloredParts[i] then
             if moneyText == "" then
-              moneyText = parts[i]
+              moneyText = coloredParts[i]
             else
-              moneyText = moneyText .. " " .. parts[i]
+              moneyText = moneyText .. " " .. coloredParts[i]
             end
-            end 
+          end 
         end
 
         ShowNotifWithIcon("+" .. moneyText, "Interface\\Icons\\INV_Misc_Coin_01", {r = 1, g = 0.8, b = 0}, nil, nil)  -- Gold border
