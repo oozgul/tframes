@@ -274,28 +274,44 @@ evtFrame:SetScript("OnEvent", function()
     if arg1 and type(arg1) == "string" and arg1 ~= "" and TFramesSettings.xp then
       local msg = tostring(arg1)
       
-      -- Extract XP amount from message like "Experience gained: 3300."
+      -- Extract XP amount from different message formats
       local xp = nil
       
-      -- Look for "Experience gained:" in the message
+      -- Pattern 1: "Experience gained: 3300."
       local gainedPos = string.find(msg, "Experience gained:", 1, true)
       if gainedPos then
-        -- Extract everything after "Experience gained: "
         local afterGained = string.sub(msg, gainedPos + 19)  -- +19 to skip "Experience gained: "
-        
-        -- Extract digits from the start
         local xpStr = ""
         for i = 1, string.len(afterGained) do
           local char = string.sub(afterGained, i, i)
           if char >= "0" and char <= "9" then
             xpStr = xpStr .. char
           else
-            break  -- Stop at first non-digit
+            break
           end
         end
-        
         if xpStr ~= "" then
           xp = tonumber(xpStr)
+        end
+      end
+      
+      -- Pattern 2: "You gain 140 experience" (fallback for other XP sources)
+      if not xp then
+        local gainPos = string.find(msg, "gain", 1, true)
+        if gainPos then
+          local afterGain = string.sub(msg, gainPos + 5)  -- +5 to skip "gain "
+          local xpStr = ""
+          for i = 1, string.len(afterGain) do
+            local char = string.sub(afterGain, i, i)
+            if char >= "0" and char <= "9" then
+              xpStr = xpStr .. char
+            else
+              break
+            end
+          end
+          if xpStr ~= "" then
+            xp = tonumber(xpStr)
+          end
         end
       end
       
