@@ -347,7 +347,7 @@ evtFrame:SetScript("OnEvent", function()
       end
       
       -- Pattern 3b: "Received Item:" (quest completion - capital I)
-      local success3b, result3b = pcall(string.find, msg, "Received Item") 
+      local success3b, result3b = pcall(string.find, msg, "Received Item:") 
       if success3b and result3b then 
         foundLoot = true 
       end
