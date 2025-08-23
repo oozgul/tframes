@@ -347,21 +347,22 @@ evtFrame:SetScript("OnEvent", function()
         foundLoot = true 
       end
       
-      -- Pattern 3: "Received item:" (quest completion)
-      local success3, result3 = pcall(string.find, msg, "Received item") 
-      if success3 and result3 then 
-        foundLoot = true 
-      end
-      
-      -- Pattern 3b: "Received Item:" (quest completion - capital I)
-      local success3b, result3b = pcall(string.find, msg, "Received Item:") 
-      if success3b and result3b then 
+      -- Pattern 3: "Received item:" or "Received Item:" (quest completion - both cases)
+      local success3a, result3a = pcall(string.find, msg, "Received item") 
+      local success3b, result3b = pcall(string.find, msg, "Received Item") 
+      if (success3a and result3a) or (success3b and result3b) then 
         foundLoot = true 
       end
       
       -- Pattern 4: Just "You loot" (alternative loot message)
       local success4, result4 = pcall(string.find, msg, "You loot")
       if success4 and result4 then 
+        foundLoot = true 
+      end
+      
+      -- Pattern 5: "You won:" (roll/need/greed wins)
+      local success5, result5 = pcall(string.find, msg, "You won:")
+      if success5 and result5 then 
         foundLoot = true 
       end
       
