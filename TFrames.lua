@@ -17,8 +17,9 @@ tx:SetTexture("Interface\\Buttons\\WHITE8X8")
 tx:SetVertexColor(0,1,0,0.5)
 TFramesAnchor:Hide()
 
--- Simple counter for stacking
-local notifCount = 0
+-- Frame management system
+local activeFrames = {}  -- Track all active notification frames
+local frameCounter = 0   -- Unique frame counter
 
 -- Settings
 local TFramesSettings = {
@@ -26,6 +27,46 @@ local TFramesSettings = {
   xp = true,
   money = true,
 }
+
+-- Function to clean up and reposition all active frames
+local function cleanupAndRepositionFrames()
+  local validFrames = {}
+  local yOffset = 50
+  
+  -- Clean up any invalid frames and collect valid ones
+  for i, frame in ipairs(activeFrames) do
+    if frame and frame:IsShown() then
+      table.insert(validFrames, frame)
+      -- Reposition the frame
+      frame:ClearAllPoints()
+      frame:SetPoint("BOTTOMLEFT", TFramesAnchor, "BOTTOMRIGHT", 10, yOffset)
+      yOffset = yOffset + 45
+    end
+  end
+  
+  -- Update the active frames list
+  activeFrames = validFrames
+end
+
+-- Function to remove a frame from tracking
+local function removeFrameFromTracking(frame)
+  for i, trackedFrame in ipairs(activeFrames) do
+    if trackedFrame == frame then
+      table.remove(activeFrames, i)
+      break
+    end
+  end
+end
+
+-- Function to clear all active frames
+local function clearAllFrames()
+  for i, frame in ipairs(activeFrames) do
+    if frame and frame:IsShown() then
+      frame:Hide()
+    end
+  end
+  activeFrames = {}
+end
 
 -- Enhanced notification function with color customization
 local function ShowNotifWithIcon(text, iconTexture, borderColor, itemLink, itemQuality)
@@ -35,18 +76,32 @@ local function ShowNotifWithIcon(text, iconTexture, borderColor, itemLink, itemQ
   end
   text = tostring(text)  -- Ensure it's a string
   
+  -- Clean up any invalid frames first
+  cleanupAndRepositionFrames()
+  
+  -- Limit maximum frames to prevent screen clutter (max 8 frames)
+  local MAX_FRAMES = 8
+  if #activeFrames >= MAX_FRAMES then
+    -- Remove the oldest frame (first in the list)
+    local oldestFrame = activeFrames[1]
+    if oldestFrame and oldestFrame:IsShown() then
+      oldestFrame:Hide()
+      removeFrameFromTracking(oldestFrame)
+    end
+  end
+  
   local f = CreateFrame("Frame", nil, UIParent)
   f:SetWidth(245)
   f:SetHeight(45)
   
-  -- Position notifications relative to the anchor
-  local yOffset = 50 + (notifCount * 45)
+  -- Calculate position based on current active frames
+  local yOffset = 50 + (#activeFrames * 45)
   local finalX = 10  -- Final X position
   local startX = finalX - 60  -- Start 60 pixels to the left (more subtle)
   
-  -- Position normally for now, we'll animate after show
-  f:SetPoint("BOTTOMLEFT", TFramesAnchor, "BOTTOMRIGHT", finalX, yOffset)
-  notifCount = notifCount + 1
+  -- Add this frame to tracking
+  table.insert(activeFrames, f)
+  frameCounter = frameCounter + 1
   
   f:SetBackdrop({
 	bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
@@ -202,8 +257,8 @@ local function ShowNotifWithIcon(text, iconTexture, borderColor, itemLink, itemQ
     else
       -- Completely faded out, hide the frame
       f:Hide()
-      notifCount = notifCount - 1
-      if notifCount < 0 then notifCount = 0 end
+      removeFrameFromTracking(f)
+      cleanupAndRepositionFrames()  -- Reposition remaining frames
       timer:SetScript("OnUpdate", nil)
     end
     end)
@@ -222,6 +277,12 @@ SlashCmdList["TFRAMES"] = function(msg)
     end
     return
   end
+  
+  if input == "clear" then
+    clearAllFrames()
+    DEFAULT_CHAT_FRAME:AddMessage("Turtle Frames: Cleared all notifications")
+    return
+  end
 
   -- Toggle settings
   local which, state = string.match(input, "^(loot|xp|money)%s+(on|off)$")
@@ -231,7 +292,7 @@ SlashCmdList["TFRAMES"] = function(msg)
     return
   end
   
-  DEFAULT_CHAT_FRAME:AddMessage("Turtle Frames: /tframes anchor | loot/xp/money on/off")
+  DEFAULT_CHAT_FRAME:AddMessage("Turtle Frames: /tframes anchor | clear | loot/xp/money on/off")
 end
 
 -- Test command
@@ -340,14 +401,13 @@ evtFrame:SetScript("OnEvent", function()
         foundLoot = true 
       end
       
-      -- Pattern 3: "Received item:" or "Received Item:" (quest completion - both cases)
-      local success3a, result3a = pcall(string.find, msg, "Received item") 
-      local success3b, result3b = pcall(string.find, msg, "Received Item") 
-      if (success3a and result3a) or (success3b and result3b) then 
+      -- Pattern 3: "Received item:" 
+      local success3, result3 = pcall(string.find, msg, "Received item") 
+      if success3 and result3 then 
         foundLoot = true 
       end
       
-      -- Pattern 4: Just "You loot" (alternative loot message)
+      -- Pattern 4: Just "You loot" (alternative loot message)w
       local success4, result4 = pcall(string.find, msg, "You loot")
       if success4 and result4 then 
         foundLoot = true 
@@ -627,4 +687,4 @@ evtFrame:SetScript("OnEvent", function()
 end) 
 
 DEFAULT_CHAT_FRAME:AddMessage("Turtle Frames: ready!")
-DEFAULT_CHAT_FRAME:AddMessage("Commands: /tframes anchor, /tftest xp/money/loot")
+DEFAULT_CHAT_FRAME:AddMessage("Commands: /tframes anchor/clear, /tftest xp/money/loot")
