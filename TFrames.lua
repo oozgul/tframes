@@ -17,14 +17,17 @@ tx:SetTexture("Interface\\Buttons\\WHITE8X8")
 tx:SetVertexColor(0,1,0,0.5)
 TFramesAnchor:Hide()
 
--- Simple counter for stacking
-local notifCount = 0
+-- Notification positioning system
+local activeNotifications = {}  -- Table to track active notification positions
+local nextNotificationId = 1
 
 -- Default settings
 local defaultSettings = {
   loot = true,
   xp = true,
   money = true,
+  honor = true,
+  reputation = true,
 }
 
 -- Settings (will be loaded from SavedVariables)
@@ -64,6 +67,41 @@ for key, defaultValue in pairs(defaultSettings) do
   TFramesSettings[key] = defaultValue
 end
 
+-- Helper functions for notification positioning
+local function FindNextAvailablePosition()
+  -- Find the lowest available Y position
+  local position = 0
+  local positionHeight = 45  -- Height of each notification + spacing
+  
+  -- Keep checking positions until we find an empty one
+  while true do
+    local positionTaken = false
+    for id, notif in pairs(activeNotifications) do
+      if notif.position == position then
+        positionTaken = true
+        break
+      end
+    end
+    
+    if not positionTaken then
+      return position
+    end
+    
+    position = position + 1
+  end
+end
+
+local function RegisterNotification(id, position)
+  activeNotifications[id] = {
+    position = position,
+    startTime = GetTime()
+  }
+end
+
+local function UnregisterNotification(id)
+  activeNotifications[id] = nil
+end
+
 -- Enhanced notification function with color customization
 local function ShowNotifWithIcon(text, iconTexture, borderColor, itemLink, itemQuality)
   -- Ensure text is valid
@@ -72,18 +110,24 @@ local function ShowNotifWithIcon(text, iconTexture, borderColor, itemLink, itemQ
   end
   text = tostring(text)  -- Ensure it's a string
   
+  -- Get unique ID and position for this notification
+  local notificationId = nextNotificationId
+  nextNotificationId = nextNotificationId + 1
+  
+  local position = FindNextAvailablePosition()
+  RegisterNotification(notificationId, position)
+  
   local f = CreateFrame("Frame", nil, UIParent)
   f:SetWidth(245)
   f:SetHeight(45)
   
-  -- Position notifications relative to the anchor
-  local yOffset = 50 + (notifCount * 45)
+  -- Position notifications relative to the anchor using the calculated position
+  local yOffset = 50 + (position * 45)
   local finalX = 10  -- Final X position
   local startX = finalX - 60  -- Start 60 pixels to the left (more subtle)
   
   -- Position normally for now, we'll animate after show
   f:SetPoint("BOTTOMLEFT", TFramesAnchor, "BOTTOMRIGHT", finalX, yOffset)
-  notifCount = notifCount + 1
   
   f:SetBackdrop({
 	bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
@@ -237,10 +281,9 @@ local function ShowNotifWithIcon(text, iconTexture, borderColor, itemLink, itemQ
       f:SetAlpha(alpha)
       f:SetPoint("BOTTOMLEFT", TFramesAnchor, "BOTTOMRIGHT", slideX, yOffset)
     else
-      -- Completely faded out, hide the frame
+      -- Completely faded out, hide the frame and unregister position
       f:Hide()
-      notifCount = notifCount - 1
-      if notifCount < 0 then notifCount = 0 end
+      UnregisterNotification(notificationId)
       timer:SetScript("OnUpdate", nil)
     end
     end)
@@ -274,15 +317,17 @@ SlashCmdList["TFRAMES"] = function(msg)
     DEFAULT_CHAT_FRAME:AddMessage("  Loot notifications: " .. (TFramesSettings.loot and "ON" or "OFF"))
     DEFAULT_CHAT_FRAME:AddMessage("  XP notifications: " .. (TFramesSettings.xp and "ON" or "OFF"))
     DEFAULT_CHAT_FRAME:AddMessage("  Money notifications: " .. (TFramesSettings.money and "ON" or "OFF"))
-    DEFAULT_CHAT_FRAME:AddMessage("Usage: /tframes <loot|xp|money> <on|off> | anchor")
+    DEFAULT_CHAT_FRAME:AddMessage("  Honor notifications: " .. (TFramesSettings.honor and "ON" or "OFF"))
+    DEFAULT_CHAT_FRAME:AddMessage("  Reputation notifications: " .. (TFramesSettings.reputation and "ON" or "OFF"))
+    DEFAULT_CHAT_FRAME:AddMessage("Usage: /tframes <loot|xp|money|honor|reputation> <on|off> | anchor")
     return
   end
 
   -- Toggle settings - using string.find instead of string.match for 1.12 compatibility
   local which, state = nil, nil
   
-  -- Parse "loot on/off", "xp on/off", "money on/off"
-  for _, setting in pairs({"loot", "xp", "money"}) do
+  -- Parse "loot on/off", "xp on/off", "money on/off", "honor on/off", "reputation on/off"
+  for _, setting in pairs({"loot", "xp", "money", "honor", "reputation"}) do
     if string.find(input, "^" .. setting) then
       which = setting
       if string.find(input, "on$") then
@@ -306,7 +351,7 @@ SlashCmdList["TFRAMES"] = function(msg)
   
   -- Invalid command
   DEFAULT_CHAT_FRAME:AddMessage("Turtle Frames: Invalid command")
-  DEFAULT_CHAT_FRAME:AddMessage("Usage: /tframes <loot|xp|money> <on|off> | anchor")
+  DEFAULT_CHAT_FRAME:AddMessage("Usage: /tframes <loot|xp|money|honor|reputation> <on|off> | anchor")
   DEFAULT_CHAT_FRAME:AddMessage("Type '/tframes' to see current settings")
 end
 
@@ -334,8 +379,16 @@ SlashCmdList["TFTEST"] = function(msg)
         ShowNotifWithIcon("Silk Cloth", "Interface\\Icons\\Trade_Tailoring", nil, nil, 2)  -- Uncommon quality
       end
     end
+  elseif msg == "honor" then
+    if TFramesSettings.honor then 
+      ShowNotifWithIcon("+125 Honor", "Interface\\Icons\\PVPCurrency-Honor-Horde", {r = 1, g = 0.2, b = 0.2}, nil, nil)  -- Red border
+    end
+  elseif msg == "reputation" then
+    if TFramesSettings.reputation then 
+      ShowNotifWithIcon("+150 Stormwind City", "Interface\\Icons\\Achievement_Reputation_01", {r = 0.2, g = 0.8, b = 0.2}, nil, nil)  -- Green border
+    end
   else
-    DEFAULT_CHAT_FRAME:AddMessage("Test: /tftest xp | money | loot")
+    DEFAULT_CHAT_FRAME:AddMessage("Test: /tftest xp | money | loot | honor | reputation")
     end
 end
 
@@ -345,6 +398,8 @@ evtFrame:RegisterEvent("ADDON_LOADED")
 evtFrame:RegisterEvent("CHAT_MSG_COMBAT_XP_GAIN")
 evtFrame:RegisterEvent("CHAT_MSG_LOOT")
 evtFrame:RegisterEvent("CHAT_MSG_MONEY")
+evtFrame:RegisterEvent("CHAT_MSG_COMBAT_HONOR_GAIN")
+evtFrame:RegisterEvent("CHAT_MSG_COMBAT_FACTION_CHANGE")
 evtFrame:RegisterEvent("ITEM_PUSH")
 evtFrame:SetScript("OnEvent", function()
   if event == "ADDON_LOADED" then
@@ -705,9 +760,116 @@ evtFrame:SetScript("OnEvent", function()
         time = GetTime()
       })
     end 
+  elseif event == "CHAT_MSG_COMBAT_HONOR_GAIN" then
+    if arg1 and type(arg1) == "string" and arg1 ~= "" and TFramesSettings.honor then
+      local msg = tostring(arg1)
+      
+      -- Debug: Show what honor message we received
+      -- DEFAULT_CHAT_FRAME:AddMessage("TFrames Debug - Honor msg: " .. msg)
+      
+      -- Extract honor amount from the message
+      local honor = nil
+      
+      -- Look for common honor patterns:
+      -- "You have been awarded 125 honor"
+      -- "Estimated Honor Points: 150"
+      -- "honorable kill... (Estimated Honor Points: 75)"
+      
+      for i = 1, string.len(msg) do
+        local char = string.sub(msg, i, i)
+        if char >= "0" and char <= "9" then
+          -- Found start of a number, extract it
+          local numStr = ""
+          for j = i, string.len(msg) do
+            local numChar = string.sub(msg, j, j)
+            if numChar >= "0" and numChar <= "9" then
+              numStr = numStr .. numChar
+            else
+              break
+            end
+          end
+          if numStr ~= "" then
+            honor = tonumber(numStr)
+            break
+          end
+        end
+      end
+      
+      if honor and honor > 0 then
+        ShowNotifWithIcon("+" .. honor .. " Honor", "Interface\\Icons\\PVPCurrency-Honor-Horde", {r = 1, g = 0.2, b = 0.2}, nil, nil)  -- Red border
+      end
+    end
+  elseif event == "CHAT_MSG_COMBAT_FACTION_CHANGE" then
+    if arg1 and type(arg1) == "string" and arg1 ~= "" and TFramesSettings.reputation then
+      local msg = tostring(arg1)
+      
+      -- Debug: Show what reputation message we received
+      -- DEFAULT_CHAT_FRAME:AddMessage("TFrames Debug - Rep msg: " .. msg)
+      
+      -- Extract reputation changes from messages like:
+      -- "Your reputation with Stormwind City has increased by 150."
+      -- "Reputation with Orgrimmar increased by 75."
+      local repAmount = nil
+      local factionName = nil
+      
+      -- Look for reputation amount
+      for i = 1, string.len(msg) do
+        local char = string.sub(msg, i, i)
+        if char >= "0" and char <= "9" then
+          -- Found start of a number, extract it
+          local numStr = ""
+          for j = i, string.len(msg) do
+            local numChar = string.sub(msg, j, j)
+            if numChar >= "0" and numChar <= "9" then
+              numStr = numStr .. numChar
+            else
+              break
+            end
+          end
+          if numStr ~= "" then
+            repAmount = tonumber(numStr)
+            break
+          end
+        end
+      end
+      
+      -- Try to extract faction name (look for "with X has" or "with X increased/decreased" patterns)
+      local withPos = string.find(msg, " with ", 1, true)
+      if withPos then
+        local afterWith = string.sub(msg, withPos + 6)  -- Everything after " with "
+        
+        -- Look for " has " or " increased" or " decreased"
+        local hasPos = string.find(afterWith, " has ", 1, true)
+        local incPos = string.find(afterWith, " increased", 1, true)
+        local decPos = string.find(afterWith, " decreased", 1, true)
+        
+        local endPos = hasPos or incPos or decPos
+        if endPos then
+          factionName = string.sub(afterWith, 1, endPos - 1)
+        end
+      end
+      
+      if repAmount and repAmount > 0 then
+        local displayText = "+" .. repAmount
+        if factionName and factionName ~= "" then
+          displayText = displayText .. " " .. factionName
+        else
+          displayText = displayText .. " Reputation"
+        end
+        
+        -- Determine border color based on gain/loss
+        local borderColor = {r = 0.2, g = 0.8, b = 0.2}  -- Green for gains
+        if string.find(msg, "decreased") then
+          borderColor = {r = 0.8, g = 0.2, b = 0.2}  -- Red for losses
+          displayText = string.gsub(displayText, "+", "-")  -- Change + to -
+        end
+        
+        ShowNotifWithIcon(displayText, "Interface\\Icons\\Achievement_Reputation_01", borderColor, nil, nil)
+      end
+    end
   end 
 end) 
 
 DEFAULT_CHAT_FRAME:AddMessage("Turtle Frames: ready!")
-DEFAULT_CHAT_FRAME:AddMessage("Commands: /tframes (shows settings), /tframes <loot|xp|money> <on|off>, /tframes anchor")
-DEFAULT_CHAT_FRAME:AddMessage("Test commands: /tftest xp/money/loot")
+DEFAULT_CHAT_FRAME:AddMessage("Commands: /tframes (shows settings), /tframes <loot|xp|money|honor|reputation> <on|off>, /tframes anchor")
+DEFAULT_CHAT_FRAME:AddMessage("Test commands: /tftest xp/money/loot/honor/reputation")
