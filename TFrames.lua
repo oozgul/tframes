@@ -20,12 +20,49 @@ TFramesAnchor:Hide()
 -- Simple counter for stacking
 local notifCount = 0
 
--- Settings
-local TFramesSettings = {
+-- Default settings
+local defaultSettings = {
   loot = true,
   xp = true,
   money = true,
 }
+
+-- Settings (will be loaded from SavedVariables)
+local TFramesSettings = {}
+
+-- Function to load settings
+local function LoadSettings()
+  -- Initialize SavedVariables if it doesn't exist
+  if not TFramesSettingsSaved then
+    TFramesSettingsSaved = {}
+  end
+  
+  for key, defaultValue in pairs(defaultSettings) do
+    if TFramesSettingsSaved[key] ~= nil then
+      TFramesSettings[key] = TFramesSettingsSaved[key]
+    else
+      TFramesSettings[key] = defaultValue
+    end
+  end
+end
+
+-- Function to save settings
+local function SaveSettings()
+  -- Initialize SavedVariables if it doesn't exist
+  if not TFramesSettingsSaved then
+    TFramesSettingsSaved = {}
+  end
+  
+  for key, value in pairs(TFramesSettings) do
+    TFramesSettingsSaved[key] = value
+  end
+end
+
+-- Initialize settings with defaults immediately
+local settingsLoaded = false
+for key, defaultValue in pairs(defaultSettings) do
+  TFramesSettings[key] = defaultValue
+end
 
 -- Enhanced notification function with color customization
 local function ShowNotifWithIcon(text, iconTexture, borderColor, itemLink, itemQuality)
@@ -212,26 +249,65 @@ end
 -- Basic slash command
 SLASH_TFRAMES1 = "/tframes"
 SlashCmdList["TFRAMES"] = function(msg)
+  -- Ensure settings are loaded
+  if not settingsLoaded then
+    LoadSettings()
+    settingsLoaded = true
+  end
+  
   local input = string.lower(tostring(msg or ""))
   
   if input == "anchor" then
     if TFramesAnchor:IsShown() then 
-      TFramesAnchor:Hide() 
+      TFramesAnchor:Hide()
+      DEFAULT_CHAT_FRAME:AddMessage("Turtle Frames: anchor hidden")
     else 
-      TFramesAnchor:Show() 
+      TFramesAnchor:Show()
+      DEFAULT_CHAT_FRAME:AddMessage("Turtle Frames: anchor shown - drag to reposition")
     end
     return
   end
 
-  -- Toggle settings
-  local which, state = string.match(input, "^(loot|xp|money)%s+(on|off)$")
+  -- Show current status if no arguments
+  if input == "" then
+    DEFAULT_CHAT_FRAME:AddMessage("Turtle Frames Settings:")
+    DEFAULT_CHAT_FRAME:AddMessage("  Loot notifications: " .. (TFramesSettings.loot and "ON" or "OFF"))
+    DEFAULT_CHAT_FRAME:AddMessage("  XP notifications: " .. (TFramesSettings.xp and "ON" or "OFF"))
+    DEFAULT_CHAT_FRAME:AddMessage("  Money notifications: " .. (TFramesSettings.money and "ON" or "OFF"))
+    DEFAULT_CHAT_FRAME:AddMessage("Usage: /tframes <loot|xp|money> <on|off> | anchor")
+    return
+  end
+
+  -- Toggle settings - using string.find instead of string.match for 1.12 compatibility
+  local which, state = nil, nil
+  
+  -- Parse "loot on/off", "xp on/off", "money on/off"
+  for _, setting in pairs({"loot", "xp", "money"}) do
+    if string.find(input, "^" .. setting) then
+      which = setting
+      if string.find(input, "on$") then
+        state = "on"
+      elseif string.find(input, "off$") then
+        state = "off"
+      end
+      break
+    end
+  end
+  
   if which and state then
-    TFramesSettings[which] = (state == "on")
-    DEFAULT_CHAT_FRAME:AddMessage("Turtle Frames: " .. which .. " " .. state)
+    local newValue = (state == "on")
+    TFramesSettings[which] = newValue
+    SaveSettings()  -- Save to persistent storage
+    
+    local statusText = newValue and "enabled" or "disabled"
+    DEFAULT_CHAT_FRAME:AddMessage("Turtle Frames: " .. which .. " notifications " .. statusText)
     return
   end
   
-  DEFAULT_CHAT_FRAME:AddMessage("Turtle Frames: /tframes anchor | loot/xp/money on/off")
+  -- Invalid command
+  DEFAULT_CHAT_FRAME:AddMessage("Turtle Frames: Invalid command")
+  DEFAULT_CHAT_FRAME:AddMessage("Usage: /tframes <loot|xp|money> <on|off> | anchor")
+  DEFAULT_CHAT_FRAME:AddMessage("Type '/tframes' to see current settings")
 end
 
 -- Test command
@@ -265,12 +341,19 @@ end
 
 -- Chat event monitoring
 local evtFrame = CreateFrame("Frame")
+evtFrame:RegisterEvent("ADDON_LOADED")
 evtFrame:RegisterEvent("CHAT_MSG_COMBAT_XP_GAIN")
 evtFrame:RegisterEvent("CHAT_MSG_LOOT")
 evtFrame:RegisterEvent("CHAT_MSG_MONEY")
 evtFrame:RegisterEvent("ITEM_PUSH")
 evtFrame:SetScript("OnEvent", function()
-  if event == "CHAT_MSG_COMBAT_XP_GAIN" then
+  if event == "ADDON_LOADED" then
+    if arg1 == "TFrames" then
+      -- Load settings when our addon is loaded
+      LoadSettings()
+      settingsLoaded = true
+    end
+  elseif event == "CHAT_MSG_COMBAT_XP_GAIN" then
     if arg1 and type(arg1) == "string" and arg1 ~= "" and TFramesSettings.xp then
       local msg = tostring(arg1)
       
@@ -626,4 +709,5 @@ evtFrame:SetScript("OnEvent", function()
 end) 
 
 DEFAULT_CHAT_FRAME:AddMessage("Turtle Frames: ready!")
-DEFAULT_CHAT_FRAME:AddMessage("Commands: /tframes anchor, /tftest xp/money/loot")
+DEFAULT_CHAT_FRAME:AddMessage("Commands: /tframes (shows settings), /tframes <loot|xp|money> <on|off>, /tframes anchor")
+DEFAULT_CHAT_FRAME:AddMessage("Test commands: /tftest xp/money/loot")
